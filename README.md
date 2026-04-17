@@ -74,7 +74,7 @@ A production-ready canary token honeypot system. Deploy bait files to detect una
 
 ```bash
 # 1. Clone and enter directory
-git clone https://github.com/your-org/canarynet.git
+git clone https://github.com/xdrew87/canarynet.git
 cd canarynet
 
 # 2. Create virtual environment

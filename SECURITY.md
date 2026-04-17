@@ -13,7 +13,7 @@
 
 To report a security issue privately:
 
-1. Email: **abuse@osintintelligence.xyz**
+1. Email: **security@osintintelligence.xyz**
 2. Subject line: `[SECURITY] CanaryNet - <brief description>`
 3. Include:
    - Description of the vulnerability

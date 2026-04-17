@@ -1,0 +1,42 @@
+{
+  "risk_weights": {
+    "known_scanner_ua": 30,
+    "tor_exit_node": 40,
+    "vpn_detected": 20,
+    "multiple_canaries_hit": 35,
+    "rapid_requests": 25,
+    "no_referrer": 10,
+    "headless_browser": 20,
+    "suspicious_country": 15,
+    "abuseipdb_score_high": 40,
+    "greynoise_malicious": 45,
+    "repeated_actor": 20
+  },
+  "risk_thresholds": {
+    "low": 20,
+    "medium": 50,
+    "high": 75,
+    "critical": 90
+  },
+  "scanner_user_agents": [
+    "python-requests",
+    "curl",
+    "wget",
+    "Go-http-client",
+    "Scrapy",
+    "masscan",
+    "nmap",
+    "nikto",
+    "sqlmap",
+    "dirbuster",
+    "gobuster",
+    "nuclei",
+    "zgrab",
+    "shodan",
+    "censys",
+    "binaryedge"
+  ],
+  "suspicious_countries": ["XX"],
+  "alert_burst_threshold": 5,
+  "alert_burst_window_seconds": 60
+}

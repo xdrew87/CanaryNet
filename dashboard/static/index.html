@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🍯 GitHub Honeypot Monitor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0a0e1a;
+      --card: #111827;
+      --card2: #1f2937;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --border: #374151;
+    }
+    body { background: var(--bg); color: #f1f5f9; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .sidebar { background: var(--card); border-right: 1px solid var(--border); }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+    .nav-item { cursor: pointer; transition: background 0.15s, color 0.15s; border-radius: 8px; }
+    .nav-item:hover { background: var(--card2); }
+    .nav-item.active { background: var(--accent); color: white; }
+    .tab { display: none; }
+    .tab.active { display: block; }
+    .badge-low    { background: #14532d; color: #86efac; }
+    .badge-medium { background: #713f12; color: #fde68a; }
+    .badge-high   { background: #7c2d12; color: #fdba74; }
+    .badge-critical { background: #7f1d1d; color: #fca5a5; }
+    .badge { padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+    table { border-collapse: collapse; width: 100%; }
+    th { text-align: left; padding: 10px 12px; font-size: 12px; text-transform: uppercase; color: #9ca3af; border-bottom: 1px solid var(--border); }
+    td { padding: 10px 12px; border-bottom: 1px solid #1f2937; font-size: 13px; }
+    tr:hover td { background: #1a2233; }
+    input, select { background: var(--card2); border: 1px solid var(--border); color: #f1f5f9; border-radius: 6px; padding: 6px 10px; font-size: 13px; outline: none; }
+    input:focus, select:focus { border-color: var(--accent); }
+    .btn { padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s; border: none; }
+    .btn-accent { background: var(--accent); color: white; }
+    .btn-accent:hover { background: var(--accent-hover); }
+    .btn-ghost { background: var(--card2); color: #9ca3af; border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--border); color: white; }
+    .btn-danger { background: #7f1d1d; color: #fca5a5; }
+    .btn-danger:hover { background: #991b1b; }
+    .spinner { border: 3px solid #374151; border-top-color: var(--accent); border-radius: 50%; width: 24px; height: 24px; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .toast { position: fixed; bottom: 24px; right: 24px; background: #1f2937; border: 1px solid var(--border); color: #f1f5f9; padding: 12px 20px; border-radius: 8px; font-size: 13px; z-index: 9999; opacity: 0; transform: translateY(10px); transition: all 0.2s; pointer-events: none; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: none; align-items: center; justify-content: center; }
+    .modal-overlay.show { display: flex; }
+    .modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; min-width: 360px; max-width: 500px; width: 100%; }
+    .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .detail-row { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .detail-label { color: #9ca3af; min-width: 160px; }
+    .scrollable { overflow-x: auto; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+  <!-- Sidebar -->
+  <aside class="sidebar w-56 flex-shrink-0 flex flex-col p-4 gap-1">
+    <div class="mb-6 mt-2">
+      <div class="text-xl font-bold text-white">🍯 Honeypot</div>
+      <div class="text-xs text-gray-500 mt-1">Monitor</div>
+    </div>
+    <nav id="nav" class="flex flex-col gap-1 flex-1">
+      <div class="nav-item active px-3 py-2 flex gap-2 items-center" data-tab="dashboard">
+        <span>📊</span><span>Dashboard</span>
+      </div>
+      <div class="nav-item px-3 py-2 flex gap-2 items-center" data-tab="events">
+        <span>⚡</span><span>Events</span>
+        <span id="events-badge" class="ml-auto bg-indigo-600 text-white text-xs px-2 py-0.5 rounded-full hidden">0</span>
+      </div>
+      <div class="nav-item px-3 py-2 flex gap-2 items-center" data-tab="actors">
+        <span>🕵️</span><span>Actors</span>
+      </div>
+      <div class="nav-item px-3 py-2 flex gap-2 items-center" data-tab="canaries">
+        <span>🪤</span><span>Canaries</span>
+      </div>
+      <div class="nav-item px-3 py-2 flex gap-2 items-center" data-tab="export">
+        <span>📥</span><span>Export</span>
+      </div>
+    </nav>
+    <div class="text-xs text-gray-600 mt-4">Auto-refresh: 30s</div>
+    <div id="last-refresh" class="text-xs text-gray-600"></div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="flex-1 overflow-y-auto p-6">
+
+    <!-- DASHBOARD TAB -->
+    <div id="tab-dashboard" class="tab active">
+      <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+      <!-- Stats cards -->
+      <div class="grid grid-cols-4 gap-4 mb-6" id="stats-cards">
+        <div class="stat-card"><div class="text-xs text-gray-400 mb-1">Total Events</div><div class="text-3xl font-bold" id="stat-total">—</div></div>
+        <div class="stat-card"><div class="text-xs text-gray-400 mb-1">Unique IPs</div><div class="text-3xl font-bold" id="stat-ips">—</div></div>
+        <div class="stat-card"><div class="text-xs text-gray-400 mb-1">Critical Alerts</div><div class="text-3xl font-bold text-red-400" id="stat-critical">—</div></div>
+        <div class="stat-card"><div class="text-xs text-gray-400 mb-1">Active Canaries</div><div class="text-3xl font-bold text-indigo-400" id="stat-canaries">—</div></div>
+      </div>
+      <!-- Charts -->
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="card p-4 col-span-2">
+          <div class="text-sm font-semibold text-gray-300 mb-3">Events Per Day (last 30 days)</div>
+          <canvas id="chart-daily" height="100"></canvas>
+        </div>
+        <div class="card p-4">
+          <div class="text-sm font-semibold text-gray-300 mb-3">Risk Distribution</div>
+          <canvas id="chart-risk" height="160"></canvas>
+          <div id="risk-legend" class="mt-3 space-y-1 text-xs"></div>
+        </div>
+      </div>
+      <!-- Top IPs -->
+      <div class="card p-4">
+        <div class="text-sm font-semibold text-gray-300 mb-3">Top Source IPs</div>
+        <div id="top-ips-table"></div>
+      </div>
+    </div>
+
+    <!-- EVENTS TAB -->
+    <div id="tab-events" class="tab">
+      <div class="flex justify-between items-center mb-4">
+        <h1 class="text-2xl font-bold">Events</h1>
+        <div class="flex gap-2">
+          <input id="events-ip-filter" type="text" placeholder="Filter by IP…" class="w-44" />
+          <select id="events-risk-filter">
+            <option value="">All Risk Levels</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+          <button class="btn btn-accent" onclick="loadEvents()">Refresh</button>
+        </div>
+      </div>
+      <div class="card scrollable">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Source IP</th>
+              <th>Country</th>
+              <th>Risk</th>
+              <th>Event Type</th>
+              <th>Canary</th>
+              <th>User-Agent</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="events-tbody">
+            <tr><td colspan="8" class="text-center py-8 text-gray-500">Loading…</td></tr>
+          </tbody>
+        </table>
+        <div class="flex justify-between items-center px-4 py-3 text-sm text-gray-400">
+          <span id="events-total-label">—</span>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost" id="events-prev" onclick="eventsPage(-1)">← Prev</button>
+            <button class="btn btn-ghost" id="events-next" onclick="eventsPage(1)">Next →</button>
+          </div>
+        </div>
+      </div>
+      <!-- Event detail panel -->
+      <div id="event-detail-panel" class="card mt-4 p-4 hidden">
+        <div class="flex justify-between items-center mb-3">
+          <div class="font-semibold">Event Detail</div>
+          <button class="btn btn-ghost text-xs" onclick="closeEventDetail()">✕ Close</button>
+        </div>
+        <div id="event-detail-content"></div>
+      </div>
+    </div>
+
+    <!-- ACTORS TAB -->
+    <div id="tab-actors" class="tab">
+      <div class="flex justify-between items-center mb-4">
+        <h1 class="text-2xl font-bold">Actors</h1>
+        <div class="flex gap-2">
+          <select id="actors-risk-filter">
+            <option value="">All Risk Levels</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+          <select id="actors-blocklist-filter">
+            <option value="">All</option>
+            <option value="true">Blocklisted</option>
+            <option value="false">Not Blocklisted</option>
+          </select>
+          <button class="btn btn-accent" onclick="loadActors()">Refresh</button>
+        </div>
+      </div>
+      <div class="card scrollable">
+        <table>
+          <thead>
+            <tr>
+              <th>IP Address</th>
+              <th>First Seen</th>
+              <th>Last Seen</th>
+              <th>Hits</th>
+              <th>Risk Level</th>
+              <th>Tags</th>
+              <th>Blocklisted</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="actors-tbody">
+            <tr><td colspan="8" class="text-center py-8 text-gray-500">Loading…</td></tr>
+          </tbody>
+        </table>
+        <div class="flex justify-between items-center px-4 py-3 text-sm text-gray-400">
+          <span id="actors-total-label">—</span>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost" id="actors-prev" onclick="actorsPage(-1)">← Prev</button>
+            <button class="btn btn-ghost" id="actors-next" onclick="actorsPage(1)">Next →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CANARIES TAB -->
+    <div id="tab-canaries" class="tab">
+      <div class="flex justify-between items-center mb-4">
+        <h1 class="text-2xl font-bold">Canary Tokens</h1>
+        <div class="flex gap-2">
+          <button class="btn btn-accent" onclick="openCreateCanaryModal()">+ New Canary</button>
+          <button class="btn btn-ghost" onclick="loadCanaries()">Refresh</button>
+        </div>
+      </div>
+      <div class="card scrollable">
+        <table>
+          <thead>
+            <tr>
+              <th>Label</th>
+              <th>Type</th>
+              <th>Hits</th>
+              <th>Last Hit</th>
+              <th>Active</th>
+              <th>URL</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="canaries-tbody">
+            <tr><td colspan="7" class="text-center py-8 text-gray-500">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- EXPORT TAB -->
+    <div id="tab-export" class="tab">
+      <h1 class="text-2xl font-bold mb-6">Export Data</h1>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="card p-6">
+          <div class="text-lg font-semibold mb-2">📋 Events</div>
+          <p class="text-gray-400 text-sm mb-4">Export all honeypot events in JSON or CSV format.</p>
+          <div class="flex gap-2">
+            <button class="btn btn-accent" onclick="downloadExport('events', 'json')">Download JSON</button>
+            <button class="btn btn-ghost" onclick="downloadExport('events', 'csv')">Download CSV</button>
+          </div>
+        </div>
+        <div class="card p-6">
+          <div class="text-lg font-semibold mb-2">🕵️ Actors</div>
+          <p class="text-gray-400 text-sm mb-4">Export all actor profiles as JSON.</p>
+          <div class="flex gap-2">
+            <button class="btn btn-accent" onclick="downloadExport('actors', 'json')">Download JSON</button>
+          </div>
+        </div>
+        <div class="card p-6">
+          <div class="text-lg font-semibold mb-2">🪤 Canaries</div>
+          <p class="text-gray-400 text-sm mb-4">Export all canary token statistics as CSV.</p>
+          <div class="flex gap-2">
+            <button class="btn btn-accent" onclick="downloadExport('canaries', 'csv')">Download CSV</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Create Canary Modal -->
+  <div id="modal-canary" class="modal-overlay">
+    <div class="modal">
+      <div class="text-lg font-semibold mb-4">Create Canary Token</div>
+      <div class="flex flex-col gap-3">
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">Label *</label>
+          <input id="modal-label" type="text" placeholder="e.g. AWS Config Bait" class="w-full" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">Bait Type</label>
+          <select id="modal-bait-type" class="w-full">
+            <option value="env_file">Environment File</option>
+            <option value="config">Config JSON</option>
+            <option value="pat">Personal Access Token</option>
+            <option value="ci_cd">CI/CD Workflow</option>
+            <option value="api_doc">API Documentation</option>
+            <option value="webhook">Webhook</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">Description</label>
+          <input id="modal-description" type="text" placeholder="Optional description" class="w-full" />
+        </div>
+        <div id="modal-error" class="text-red-400 text-xs hidden"></div>
+        <div class="flex gap-2 justify-end mt-2">
+          <button class="btn btn-ghost" onclick="closeCreateCanaryModal()">Cancel</button>
+          <button class="btn btn-accent" onclick="createCanary()">Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
